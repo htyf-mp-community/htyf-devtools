@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "reporters": {
+    "@htyf-mp/devtools-react-native": {"min": "0.1.0", "maxExclusive": "0.2.0"},
+    "@htyf-mp/devtools-electron": {"min": "0.1.0", "maxExclusive": "0.2.0"},
+    "@htyf-mp/devtools-web": {"min": "0.1.0", "maxExclusive": "0.2.0"},
+    "@htyf-mp/devtools-desktop-demo": {"min": "0.1.0", "maxExclusive": "0.2.0"}
+  }
+}

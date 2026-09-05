@@ -1,0 +1,31 @@
+{
+  "name": "@htyf-mp/devtools-web",
+  "version": "0.1.1",
+  "description": "HTYF DevTools reporter for browser applications",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build",
+    "pretest": "pnpm --filter @htyf-mp/devtools-protocol build && pnpm --filter @htyf-mp/devtools-react-native build",
+    "type-check": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@htyf-mp/devtools-react-native": "workspace:*"
+  },
+  "devDependencies": {
+    "@htyf-mp/devtools-protocol": "workspace:*",
+    "typescript": "^5.9.2"
+  }
+}

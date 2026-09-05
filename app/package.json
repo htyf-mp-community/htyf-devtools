@@ -1,0 +1,36 @@
+{
+  "name": "@htyf-mp/devtools-desktop",
+  "version": "0.1.0",
+  "description": "红糖开发助手桌面客户端",
+  "author": "红糖云服",
+  "private": true,
+  "main": "src/main.cjs",
+  "scripts": {
+    "prepare-frontend": "node scripts/prepare-frontend.cjs",
+    "pretest": "pnpm run prepare-frontend",
+    "start": "pnpm run prepare-frontend && node scripts/run-desktop.cjs",
+    "start:background": "pnpm run prepare-frontend && node scripts/run-desktop.cjs --detach",
+    "start:demo": "pnpm run prepare-frontend && node scripts/run-desktop.cjs --demo --port=0",
+    "start:demo:background": "pnpm run prepare-frontend && node scripts/run-desktop.cjs --demo --port=0 --detach",
+    "start:lan": "pnpm run prepare-frontend && node scripts/run-desktop.cjs --host=0.0.0.0",
+    "start:inspect": "pnpm run prepare-frontend && node scripts/run-desktop.cjs --inspect=9229",
+    "package:dir": "pnpm run prepare-frontend && node scripts/build.cjs dir",
+    "dist:mac": "pnpm run prepare-frontend && node scripts/build.cjs mac",
+    "dist:win": "pnpm run prepare-frontend && node scripts/build.cjs win",
+    "release:mac": "pnpm run prepare-frontend && node scripts/build.cjs mac --signed",
+    "release:win": "pnpm run prepare-frontend && node scripts/build.cjs win --signed",
+    "test": "node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "electron-updater": "6.6.2",
+    "portfinder": "1.0.38",
+    "qrcode": "1.5.4",
+    "systeminformation": "5.33.8",
+    "ws": "7.5.12"
+  },
+  "devDependencies": {
+    "@react-native/debugger-frontend": "0.86.3",
+    "electron": "39.8.10",
+    "electron-builder": "26.16.0"
+  }
+}

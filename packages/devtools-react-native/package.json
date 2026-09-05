@@ -1,0 +1,37 @@
+{
+  "name": "@htyf-mp/devtools-react-native",
+  "version": "0.1.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "react-native": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "react-native": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build",
+    "pretest": "pnpm --filter @htyf-mp/devtools-protocol build",
+    "type-check": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
+  },
+  "peerDependencies": {
+    "@htyf-mp/devtools-protocol": "^0.1.0",
+    "react-native": ">=0.76"
+  },
+  "peerDependenciesMeta": {
+    "react-native": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@htyf-mp/devtools-protocol": "workspace:*",
+    "typescript": "^5.9.2"
+  }
+}

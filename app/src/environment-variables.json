@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "variables": [
+    {
+      "key": "HTYF_DEVTOOLS_TEST_ENV",
+      "description": "测试环境设置"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "mp-devtools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "红糖开发助手独立 monorepo",
+  "packageManager": "pnpm@10.29.3",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron"
+    ]
+  },
+  "scripts": {
+    "build": "lerna run build --stream",
+    "test": "lerna run test --stream",
+    "type-check": "lerna run build --stream && lerna run type-check --stream",
+    "dev": "pnpm --filter @htyf-mp/devtools-desktop start",
+    "dev:demo": "pnpm --filter @htyf-mp/devtools-desktop start:demo",
+    "dev:inspect": "pnpm --filter @htyf-mp/devtools-desktop start:inspect",
+    "app:pack": "pnpm --filter @htyf-mp/devtools-desktop run package:dir",
+    "app:dist:mac": "pnpm --filter @htyf-mp/devtools-desktop run dist:mac",
+    "app:dist:win": "pnpm --filter @htyf-mp/devtools-desktop run dist:win",
+    "app:release:mac": "pnpm --filter @htyf-mp/devtools-desktop run release:mac",
+    "app:release:win": "pnpm --filter @htyf-mp/devtools-desktop run release:win",
+    "version": "lerna version",
+    "release:npm": "node scripts/publish-packages.cjs"
+  },
+  "devDependencies": {
+    "lerna": "10.0.1",
+    "typescript": "^5.9.2"
+  }
+}

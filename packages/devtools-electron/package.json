@@ -1,0 +1,35 @@
+{
+  "name": "@htyf-mp/devtools-electron",
+  "version": "0.1.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build",
+    "pretest": "pnpm --filter @htyf-mp/devtools-protocol build",
+    "test": "node --experimental-strip-types --test test/*.test.mjs",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@htyf-mp/devtools-protocol": "workspace:*"
+  },
+  "peerDependencies": {
+    "electron": ">=30"
+  },
+  "peerDependenciesMeta": {
+    "electron": {"optional": true}
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "typescript": "^5.9.2"
+  }
+}
