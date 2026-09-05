@@ -21,8 +21,10 @@
     "app:dist:win": "pnpm --filter @htyf-mp/devtools-desktop run dist:win",
     "app:release:mac": "pnpm --filter @htyf-mp/devtools-desktop run release:mac",
     "app:release:win": "pnpm --filter @htyf-mp/devtools-desktop run release:win",
-    "version": "lerna version",
-    "release:npm": "node scripts/publish-packages.cjs"
+    "release:version": "lerna version --no-private",
+    "release:check": "lerna run build --no-private --stream && lerna run type-check --no-private --stream && lerna run test --no-private --stream",
+    "release:npm": "pnpm release:check && lerna publish from-package",
+    "release:npm:dry-run": "pnpm release:check && lerna exec --no-private --stream -- pnpm publish --dry-run --no-git-checks"
   },
   "devDependencies": {
     "lerna": "10.0.1",
