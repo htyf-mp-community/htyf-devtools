@@ -62,7 +62,7 @@ test('registers a browser runtime and restores the WebSocket constructor', () =>
   assert.equal(hello.type, 'runtime.hello');
   assert.equal(hello.payload.platform, 'web');
   assert.equal(hello.payload.reporter.packageName, '@htyf-mp/devtools-web');
-  assert.equal(hello.payload.reporter.version, '0.1.0');
+  assert.equal(hello.payload.reporter.version, '0.1.2');
   assert.equal(hello.payload.token, '123456');
 
   const businessSocket = new globalThis.WebSocket('ws://business/socket');

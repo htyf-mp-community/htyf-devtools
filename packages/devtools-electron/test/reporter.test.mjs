@@ -96,7 +96,7 @@ test('identifies an Electron main-process runtime and restores globals', async (
   const hello = transport.sent.find(message => message.type === 'runtime.hello');
   assert.equal(hello.payload.platform, 'electron-main');
   assert.equal(hello.payload.reporter.packageName, '@htyf-mp/devtools-electron');
-  assert.equal(hello.payload.reporter.version, '0.1.1');
+  assert.equal(hello.payload.reporter.version, '0.1.2');
   assert.ok(hello.payload.capabilities.includes('http'));
   assert.ok(transport.sent.some(message => message.type === 'http.response.body' && message.payload.body === 'hello'));
 

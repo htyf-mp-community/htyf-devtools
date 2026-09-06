@@ -76,8 +76,8 @@ test('captures application WebSocket traffic and restores the global constructor
   ]);
   const hello = messages(transport)[0];
   assert.equal(hello.payload.reporter.packageName, '@htyf-mp/devtools-react-native');
-  assert.equal(hello.payload.reporter.version, '0.1.0');
-  assert.deepEqual(hello.payload.reporter, {packageName: '@htyf-mp/devtools-react-native', version: '0.1.0'});
+  assert.equal(hello.payload.reporter.version, '0.1.2');
+  assert.deepEqual(hello.payload.reporter, {packageName: '@htyf-mp/devtools-react-native', version: '0.1.2'});
   assert.equal(hello.payload.platform, 'react-native');
   assert.deepEqual(applicationSocket.sent, ['outgoing']);
   reporter.stop();

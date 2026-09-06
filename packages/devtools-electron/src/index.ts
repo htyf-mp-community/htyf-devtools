@@ -1,8 +1,15 @@
-import {PROTOCOL_VERSION, type ConsoleLevel, type ReporterEnvelope, type RuntimeInfo} from '@htyf-mp/devtools-protocol';
+import {PROTOCOL_VERSION, type ManualReporter, type ReportEventMap, type ConsoleLevel, type ReporterEnvelope, type RuntimeInfo} from '@htyf-mp/devtools-protocol';
 import http from 'node:http';
 import https from 'node:https';
 
-export const REPORTER_VERSION = '0.1.1';
+export type {
+  ConsoleLevel, ConsoleEntry, HttpRequestStarted, HttpResponseReceived,
+  HttpResponseBody, HttpRequestCompleted, HttpRequestFailed,
+  WebSocketCreated, WebSocketOpened, WebSocketFrame, WebSocketClosed,
+  WebSocketError, ReportEventMap, ManualReporter,
+} from '@htyf-mp/devtools-protocol';
+
+export const REPORTER_VERSION = '0.1.2';
 
 /** Electron 主进程 Reporter 配置；不依赖 renderer 或 Electron IPC。 */
 export interface ElectronDevToolsOptions {
@@ -13,8 +20,8 @@ export interface ElectronDevToolsOptions {
     deviceName?: string;
     os?: string;
   };
-  /** 采集开关，未配置的项目默认开启。 */
-  capture?: {console?: boolean; fetch?: boolean; nodeHttp?: boolean; websocket?: boolean};
+  /** 自动采集开关，未配置的项目默认开启；false 关闭全部自动采集，手动上报仍可用。 */
+  capture?: false | {console?: boolean; fetch?: boolean; nodeHttp?: boolean; websocket?: boolean};
   /** Third-party Node WebSocket constructors, for example the default export from `ws`. */
   webSocketConstructors?: NodeWebSocketConstructor[];
   maxBodyBytes?: number;
@@ -39,7 +46,7 @@ export interface ObserveWebSocketOptions {
 }
 
 /** start/stop 幂等；observeWebSocket 用于 WebSocketServer 已接收的连接。 */
-export interface ElectronDevToolsReporter {
+export interface ElectronDevToolsReporter extends ManualReporter {
   start(): void;
   stop(): void;
   observeWebSocket(socket: NodeWebSocketLike, metadata?: ObserveWebSocketOptions): () => void;
@@ -86,7 +93,7 @@ export function createElectronDevTools(options: ElectronDevToolsOptions): Electr
   const cleanups: Array<() => void> = [];
   const observedSockets = new WeakMap<object, {socketId: string; url: string; opened: boolean; direction: 'client' | 'server'}>();
   const instrumentedPrototypes = new WeakSet<object>();
-  const captureEnabled = (name: 'console' | 'fetch' | 'nodeHttp' | 'websocket') => options.capture?.[name] !== false;
+  const captureEnabled = (name: 'console' | 'fetch' | 'nodeHttp' | 'websocket') => options.capture !== false && options.capture?.[name] !== false;
   // DevTools is strictly observational: its failures must never escape into the application.
   const safely = <T>(operation: () => T): T | undefined => {
     try { return operation(); } catch { return undefined; }
@@ -98,6 +105,26 @@ export function createElectronDevTools(options: ElectronDevToolsOptions): Electr
       const encoded = JSON.stringify(message);
       if (socket?.readyState === WebSocket.OPEN) socket.send(encoded);
       else { queue.push(encoded); if (queue.length > 2000) queue.shift(); }
+    });
+  };
+
+  // 与自动采集共用传输队列和身份；仅序列化任意业务值，保留完整协议字段。
+  const report: ManualReporter['report'] = (type, payload) => {
+    if (stopped) return;
+    safely(() => {
+      const event: Record<string, unknown> = {...payload};
+      if (type === 'console.entry') {
+        event.arguments = (payload as ReportEventMap['console.entry']).arguments.map(value => safeValue(value));
+      }
+      if ('error' in event) event.error = safeValue(event.error);
+      if ('data' in event) event.data = safeValue(event.data);
+      if (typeof event.body === 'string') {
+        const limit = options.maxBodyBytes ?? 1_000_000;
+        const truncatedKey = type === 'http.request.started' ? 'bodyTruncated' : 'truncated';
+        event[truncatedKey] = Boolean(event[truncatedKey]) || event.body.length > limit;
+        event.body = event.body.slice(0, limit);
+      }
+      send(type, event);
     });
   };
 
@@ -116,11 +143,8 @@ export function createElectronDevTools(options: ElectronDevToolsOptions): Electr
         runtimeId,
         deviceId,
         platform: 'electron-main',
-        capabilities: [
-          captureEnabled('console') && 'console',
-          (captureEnabled('fetch') || captureEnabled('nodeHttp')) && 'http',
-          captureEnabled('websocket') && 'websocket',
-        ].filter((name): name is string => Boolean(name)),
+        // 手动上报始终支持三类事件，capture 仅控制自动采集。
+        capabilities: ['console', 'http', 'websocket'],
         reporter: {
           packageName: '@htyf-mp/devtools-electron',
           version: REPORTER_VERSION,
@@ -454,6 +478,19 @@ export function createElectronDevTools(options: ElectronDevToolsOptions): Electr
   };
 
   return {
+    report,
+    reportConsole: event => report('console.entry', event),
+    reportHttpRequestStarted: event => report('http.request.started', event),
+    reportHttpResponseReceived: event => report('http.response.received', event),
+    reportHttpResponseBody: event => report('http.response.body', event),
+    reportHttpRequestCompleted: event => report('http.request.completed', event),
+    reportHttpRequestFailed: event => report('http.request.failed', event),
+    reportWebSocketCreated: event => report('websocket.created', event),
+    reportWebSocketOpened: event => report('websocket.opened', event),
+    reportWebSocketFrameSent: event => report('websocket.frameSent', event),
+    reportWebSocketFrameReceived: event => report('websocket.frameReceived', event),
+    reportWebSocketClosed: event => report('websocket.closed', event),
+    reportWebSocketError: event => report('websocket.error', event),
     start() {
       if (!stopped) return;
       stopped = false;

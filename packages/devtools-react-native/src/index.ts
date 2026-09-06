@@ -1,6 +1,13 @@
-import {PROTOCOL_VERSION, type ConsoleLevel, type ReporterEnvelope, type ReporterVersionInfo, type RuntimeInfo, type RuntimePlatform} from '@htyf-mp/devtools-protocol';
+import {PROTOCOL_VERSION, type ManualReporter, type ReportEventMap, type ConsoleLevel, type ReporterEnvelope, type ReporterVersionInfo, type RuntimeInfo, type RuntimePlatform} from '@htyf-mp/devtools-protocol';
 
-export const REPORTER_VERSION = '0.1.0';
+export type {
+  ConsoleLevel, ConsoleEntry, HttpRequestStarted, HttpResponseReceived,
+  HttpResponseBody, HttpRequestCompleted, HttpRequestFailed,
+  WebSocketCreated, WebSocketOpened, WebSocketFrame, WebSocketClosed,
+  WebSocketError, ReportEventMap, ManualReporter,
+} from '@htyf-mp/devtools-protocol';
+
+export const REPORTER_VERSION = '0.1.2';
 
 /** React Native Reporter 的最小配置。endpoint 与 token 可直接从 Desktop Welcome 页复制。 */
 export interface DevToolsOptions {
@@ -12,15 +19,15 @@ export interface DevToolsOptions {
     os?: string;
   };
   /**
-   * 采集开关，未配置的项目默认开启。
+   * 自动采集开关，未配置的项目默认开启；false 关闭全部自动采集，手动上报仍可用。
    * Axios 在 React Native/浏览器中通常使用 XHR，因此默认同时开启 fetch 与 xhr。
    */
-  capture?: {console?: boolean; fetch?: boolean; xhr?: boolean; websocket?: boolean};
+  capture?: false | {console?: boolean; fetch?: boolean; xhr?: boolean; websocket?: boolean};
   maxBodyBytes?: number;
 }
 
 /** start/stop 均可重复调用；stop 会恢复所有被包装的全局对象。 */
-export interface DevToolsReporter { start(): void; stop(): void; }
+export interface DevToolsReporter extends ManualReporter { start(): void; stop(): void; }
 
 const id = (prefix: string) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
 
@@ -56,7 +63,7 @@ export function createDevToolsWithIdentity(
   let reconnectAttempt = 0;
   const queue: string[] = [];
   const cleanups: Array<() => void> = [];
-  const captureEnabled = (name: 'console' | 'fetch' | 'xhr' | 'websocket') => options.capture?.[name] !== false;
+  const captureEnabled = (name: 'console' | 'fetch' | 'xhr' | 'websocket') => options.capture !== false && options.capture?.[name] !== false;
 
   // Reporter 是旁路诊断模块：任何内部异常都不得逃逸到业务调用栈。
   const safely = <T>(operation: () => T): T | undefined => {
@@ -70,6 +77,26 @@ export function createDevToolsWithIdentity(
       if (socket?.readyState === WebSocket.OPEN) socket.send(encoded);
       // Reload/切网期间保留最近事件；设上限以免调试服务长期离线时持续占用 RN 内存。
       else { queue.push(encoded); if (queue.length > 2000) queue.shift(); }
+    });
+  };
+
+  // 与自动采集共用传输队列和身份；仅序列化任意业务值，保留完整协议字段。
+  const report: ManualReporter['report'] = (type, payload) => {
+    if (stopped) return;
+    safely(() => {
+      const event: Record<string, unknown> = {...payload};
+      if (type === 'console.entry') {
+        event.arguments = (payload as ReportEventMap['console.entry']).arguments.map(value => safeValue(value));
+      }
+      if ('error' in event) event.error = safeValue(event.error);
+      if ('data' in event) event.data = safeValue(event.data);
+      if (typeof event.body === 'string') {
+        const limit = options.maxBodyBytes ?? 1_000_000;
+        const truncatedKey = type === 'http.request.started' ? 'bodyTruncated' : 'truncated';
+        event[truncatedKey] = Boolean(event[truncatedKey]) || event.body.length > limit;
+        event.body = event.body.slice(0, limit);
+      }
+      send(type, event);
     });
   };
 
@@ -88,11 +115,8 @@ export function createDevToolsWithIdentity(
         runtimeId,
         deviceId: options.app.deviceId ?? id('device'),
         platform: identity.platform,
-        capabilities: [
-          captureEnabled('console') && 'console',
-          (captureEnabled('fetch') || captureEnabled('xhr')) && 'http',
-          captureEnabled('websocket') && 'websocket',
-        ].filter((name): name is string => Boolean(name)),
+        // 手动上报始终支持三类事件，capture 仅控制自动采集。
+        capabilities: ['console', 'http', 'websocket'],
         reporter: identity.reporter,
         token: options.token,
       });
@@ -240,6 +264,19 @@ export function createDevToolsWithIdentity(
   };
 
   return {
+    report,
+    reportConsole: event => report('console.entry', event),
+    reportHttpRequestStarted: event => report('http.request.started', event),
+    reportHttpResponseReceived: event => report('http.response.received', event),
+    reportHttpResponseBody: event => report('http.response.body', event),
+    reportHttpRequestCompleted: event => report('http.request.completed', event),
+    reportHttpRequestFailed: event => report('http.request.failed', event),
+    reportWebSocketCreated: event => report('websocket.created', event),
+    reportWebSocketOpened: event => report('websocket.opened', event),
+    reportWebSocketFrameSent: event => report('websocket.frameSent', event),
+    reportWebSocketFrameReceived: event => report('websocket.frameReceived', event),
+    reportWebSocketClosed: event => report('websocket.closed', event),
+    reportWebSocketError: event => report('websocket.error', event),
     start() {
       if (!stopped) return;
       stopped = false;

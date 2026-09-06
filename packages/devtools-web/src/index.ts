@@ -26,3 +26,10 @@ export function createWebDevTools(options: WebDevToolsOptions): WebDevToolsRepor
     },
   });
 }
+
+export type {
+  ConsoleLevel, ConsoleEntry, HttpRequestStarted, HttpResponseReceived,
+  HttpResponseBody, HttpRequestCompleted, HttpRequestFailed,
+  WebSocketCreated, WebSocketOpened, WebSocketFrame, WebSocketClosed,
+  WebSocketError, ReportEventMap, ManualReporter,
+} from '@htyf-mp/devtools-react-native';

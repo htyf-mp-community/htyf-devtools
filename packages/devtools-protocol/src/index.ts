@@ -57,6 +57,7 @@ export interface HttpRequestStarted {
   url: string;
   headers?: Record<string, string>;
   body?: string;
+  bodyTruncated?: boolean;
 }
 
 /** HTTP 响应头已可用，不代表响应体已经读取完成。 */
@@ -67,4 +68,87 @@ export interface HttpResponseReceived {
   statusText?: string;
   headers?: Record<string, string>;
   mimeType?: string;
+}
+
+export interface HttpResponseBody {
+  requestId: string;
+  body: string;
+  truncated?: boolean;
+}
+
+export interface HttpRequestCompleted {
+  requestId: string;
+  /** 耗时，单位毫秒。 */
+  duration?: number;
+  size?: number;
+}
+
+export interface HttpRequestFailed {
+  requestId: string;
+  error: unknown;
+  duration?: number;
+  canceled?: boolean;
+}
+
+export interface WebSocketCreated {
+  socketId: string;
+  url: string;
+  direction?: 'client' | 'server';
+}
+
+export interface WebSocketOpened extends WebSocketCreated {
+  requestHeaders?: Record<string, string>;
+  responseHeaders?: Record<string, string>;
+}
+
+export interface WebSocketFrame {
+  socketId: string;
+  data: unknown;
+  direction?: 'client' | 'server';
+}
+
+export interface WebSocketClosed {
+  socketId: string;
+  code?: number;
+  reason?: string;
+  direction?: 'client' | 'server';
+}
+
+export interface WebSocketError {
+  socketId: string;
+  error?: unknown;
+  direction?: 'client' | 'server';
+}
+
+/** 可手动上报的业务事件；运行时握手和心跳由 Reporter 管理。 */
+export interface ReportEventMap {
+  'console.entry': ConsoleEntry;
+  'http.request.started': HttpRequestStarted;
+  'http.response.received': HttpResponseReceived;
+  'http.response.body': HttpResponseBody;
+  'http.request.completed': HttpRequestCompleted;
+  'http.request.failed': HttpRequestFailed;
+  'websocket.created': WebSocketCreated;
+  'websocket.opened': WebSocketOpened;
+  'websocket.frameSent': WebSocketFrame;
+  'websocket.frameReceived': WebSocketFrame;
+  'websocket.closed': WebSocketClosed;
+  'websocket.error': WebSocketError;
+}
+
+/** 方法可解构后用于二次封装。需先 start；stop 后调用会被忽略。 */
+export interface ManualReporter {
+  report<K extends keyof ReportEventMap>(type: K, payload: ReportEventMap[K]): void;
+  reportConsole(entry: ConsoleEntry): void;
+  reportHttpRequestStarted(event: HttpRequestStarted): void;
+  reportHttpResponseReceived(event: HttpResponseReceived): void;
+  reportHttpResponseBody(event: HttpResponseBody): void;
+  reportHttpRequestCompleted(event: HttpRequestCompleted): void;
+  reportHttpRequestFailed(event: HttpRequestFailed): void;
+  reportWebSocketCreated(event: WebSocketCreated): void;
+  reportWebSocketOpened(event: WebSocketOpened): void;
+  reportWebSocketFrameSent(event: WebSocketFrame): void;
+  reportWebSocketFrameReceived(event: WebSocketFrame): void;
+  reportWebSocketClosed(event: WebSocketClosed): void;
+  reportWebSocketError(event: WebSocketError): void;
 }

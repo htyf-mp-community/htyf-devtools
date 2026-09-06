@@ -1,0 +1,4 @@
+import {createElectronDevTools} from '../src/index.ts';
+import {testManualReporter} from '../../test/manual-reporter.mjs';
+
+testManualReporter(createElectronDevTools);
