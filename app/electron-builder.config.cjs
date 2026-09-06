@@ -11,8 +11,11 @@ module.exports = {
   artifactName: 'v${version}/${os}/${arch}/latest.${ext}',
   publish: [{provider: 'generic', url: updateUrl}],
   generateUpdatesFilesForAllChannels: true,
+  dmg: {title: '红糖开发助手'},
   mac: {
-    executableName: 'HongtangDeveloperAssistant',
+    notarize: true,
+    hardenedRuntime: true,
+    executableName: '红糖开发助手',
     icon: 'build/icon.png',
     category: 'public.app-category.developer-tools',
     minimumSystemVersion: '11.0',
@@ -22,7 +25,7 @@ module.exports = {
     ],
   },
   win: {
-    executableName: 'HongtangDeveloperAssistant',
+    executableName: '红糖开发助手',
     icon: 'build/icon.png',
     requestedExecutionLevel: 'asInvoker',
     target: [{target: 'nsis', arch: ['x64']}, {target: 'zip', arch: ['x64']}],

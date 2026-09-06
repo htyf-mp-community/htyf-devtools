@@ -135,7 +135,35 @@ HTYF_DEVTOOLS_UPDATE_URL=https://download.example.com/devtools pnpm devtools:rel
 HTYF_DEVTOOLS_UPDATE_URL=https://download.example.com/devtools pnpm devtools:release:win
 ```
 
-签名构建由 electron-builder 读取标准签名配置：macOS 可使用钥匙串中的 Developer ID Application 证书，或配置 `CSC_LINK`、`CSC_KEY_PASSWORD`；Windows 可配置 `WIN_CSC_LINK`、`WIN_CSC_KEY_PASSWORD`。Apple 公证仍需在发布 CI 中配置 Apple 账号或 App Store Connect API Key。不要把证书、密码或 API Key 写进仓库。
+签名构建由 electron-builder 读取标准签名配置：macOS 可使用钥匙串中的 Developer ID Application 证书，或配置 `CSC_LINK`、`CSC_KEY_PASSWORD`；Windows 可配置 `WIN_CSC_LINK`、`WIN_CSC_KEY_PASSWORD`。macOS 正式发布会强制签名，并通过 electron-builder 内置集成提交 Apple 公证、等待成功和为应用附加票据；缺少公证凭据时会在打包前退出。不要把证书、密码或 API Key 写进仓库。
+
+### macOS 公证
+
+在 macOS 上安装 Xcode 命令行工具，并准备有效的 Developer ID Application 证书（钥匙串或 `CSC_LINK` / `CSC_KEY_PASSWORD`）。本机发布时把公证凭据写入 Git 忽略的 `app/notarization.local.json`；CI 也可以通过环境变量覆盖同名字段。凭据选择以下一种：
+
+- App Store Connect API Key：`APPLE_API_KEY`（`.p8` 文件绝对路径）、`APPLE_API_KEY_ID`、`APPLE_API_ISSUER`。
+- Apple 账号：`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`（App 专用密码）、`APPLE_TEAM_ID`。
+- 已通过 `xcrun notarytool store-credentials` 保存的钥匙串凭据：`APPLE_KEYCHAIN_PROFILE`，可选 `APPLE_KEYCHAIN` 指定钥匙串路径。
+
+只配置一种认证方式；证书签名与公证认证是两组独立凭据。准备完成后，在仓库根目录运行：
+
+```bash
+cp app/notarization.local.example.json app/notarization.local.json
+# 编辑 app/notarization.local.json，填入本机凭据
+pnpm app:release:mac
+```
+
+本地测试用 `pnpm app:dist:mac`，该命令禁用公证。正式发布需要联网访问 Apple；认证失败、公证拒绝或票据附加失败都会使构建失败。内置集成对 `.app` 公证并附加票据，然后将其打包进 DMG/ZIP，无需额外添加重复的 `afterSign` 公证钩子。
+
+发布前验证：
+
+```bash
+codesign --verify --deep --strict "app/release/mac-universal/红糖开发助手.app"
+xcrun stapler validate "app/release/mac-universal/红糖开发助手.app"
+spctl --assess --type execute --verbose=2 "app/release/mac-universal/红糖开发助手.app"
+```
+
+参考：[electron-builder 公证文档](https://www.electron.build/v26/docs/features/code-signing/notarization/)。
 
 Windows 安装包通常可以在 macOS CI 上交叉构建；macOS 应用必须在 macOS 上完成签名与公证。建议发布流水线分别使用 macOS runner 和 Windows runner 验证最终产物。
 

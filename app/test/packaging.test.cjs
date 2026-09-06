@@ -9,8 +9,12 @@ test('mac release is a single universal package with branded icons', () => {
   const config = require('../electron-builder.config.cjs');
   const buildScript = fs.readFileSync(path.join(root, 'scripts/build.cjs'), 'utf8');
   assert.equal(config.productName, '红糖开发助手');
-  assert.equal(config.mac.executableName, 'HongtangDeveloperAssistant');
-  assert.equal(config.win.executableName, 'HongtangDeveloperAssistant');
+  const {AppInfo} = require('app-builder-lib/out/appInfo');
+  const appInfo = new AppInfo({config, metadata: require('../package.json')}, undefined, config.mac);
+  assert.equal(appInfo.productFilename, '红糖开发助手');
+  assert.equal(config.dmg.title, '红糖开发助手');
+  const windowsAppInfo = new AppInfo({config, metadata: require('../package.json')}, undefined, config.win);
+  assert.equal(windowsAppInfo.productFilename, '红糖开发助手');
   assert.equal(config.nsis.shortcutName, '红糖开发助手');
   assert.equal(config.nsis.uninstallDisplayName, '红糖开发助手');
   assert.equal(config.artifactName, 'v${version}/${os}/${arch}/latest.${ext}');
