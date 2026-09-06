@@ -6,9 +6,10 @@ module.exports = {
   appId: 'com.dagouzhi.mp.devtools',
   productName: '红糖开发助手',
   asar: true,
-  directories: {output: 'release', buildResources: 'build'},
+  // 更新清单写入 output，必须与安装包使用同一个版本/系统目录。
+  directories: {output: 'release/v${version}/${os}', buildResources: 'build'},
   files: ['src/**/*', 'frontend-dist/**/*', 'package.json'],
-  artifactName: 'v${version}/${os}/latest.${ext}',
+  artifactName: 'latest.${ext}',
   publish: [{provider: 'generic', url: updateUrl}],
   generateUpdatesFilesForAllChannels: true,
   dmg: {title: '红糖开发助手'},

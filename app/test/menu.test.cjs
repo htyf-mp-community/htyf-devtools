@@ -7,7 +7,7 @@ const vm = require('node:vm');
 test('desktop editing commands survive application menu rebuilds', () => {
   let menu;
   const electron = {
-    app: {whenReady: () => new Promise(() => {}), on() {}},
+    app: {requestSingleInstanceLock: () => true, whenReady: () => new Promise(() => {}), on() {}},
     Menu: {
       buildFromTemplate: template => template,
       setApplicationMenu: value => { menu = value; },

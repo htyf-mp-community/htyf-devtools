@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('devtoolsHost', {
   setPairingToken: token => ipcRenderer.invoke('devtools:set-pairing-token', token),
   openRuntime: runtimeId => ipcRenderer.invoke('devtools:open-runtime', runtimeId),
   copy: text => ipcRenderer.invoke('devtools:copy', text),
+  openWebsite: () => ipcRenderer.invoke('devtools:open-website'),
   getEnvironment: () => ipcRenderer.invoke('devtools:environment:get'),
   setEnvironment: values => ipcRenderer.invoke('devtools:environment:set', values),
   addEnvironmentVariable: variable => ipcRenderer.invoke('devtools:environment:add', variable),

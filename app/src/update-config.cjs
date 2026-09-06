@@ -1,11 +1,10 @@
 const os = require('os');
-let platform = '';
+let platform = os.platform();
 if (platform === 'darwin') {
   platform = 'mac';
 } else if (platform === 'win32') {
   platform = 'win';
 }
-
 const DEFAULT_UPDATE_URL = `https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/${platform}`;
 
 function getUpdateUrl(environment = process.env) {

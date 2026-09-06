@@ -1,6 +1,8 @@
 const path = require('node:path');
 const fs = require('node:fs');
-const {app, BrowserWindow, Menu, ipcMain, clipboard, dialog} = require('electron');
+const {app, BrowserWindow, Menu, ipcMain, clipboard, dialog, shell} = require('electron');
+// 在服务启动前获取应用锁，避免第二个进程占用端口或创建窗口。
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
 const QRCode = require('qrcode');
 const {DevToolsServer} = require('./server.cjs');
 const {DemoRuntime} = require('./demo-runtime.cjs');
@@ -13,14 +15,26 @@ let server;
 let activeRuntimeId;
 let demoRuntime;
 let shutdownPromise;
+let pendingWindowFocus = false;
 const updater = createAutoUpdateController(() => window);
 const compatibilityNotices = new Map();
-const demoSessionDir = process.env.HTYF_DEVTOOLS_DEMO === '1' ? path.join(app.getPath('temp'), `htyf-devtools-demo-${process.pid}`) : undefined;
+const demoSessionDir = hasSingleInstanceLock && process.env.HTYF_DEVTOOLS_DEMO === '1' ? path.join(app.getPath('temp'), `htyf-devtools-demo-${process.pid}`) : undefined;
 if (demoSessionDir) app.setPath('sessionData', demoSessionDir);
 
 function hasLiveWindow() {
   // Electron JS 包装对象在原生窗口销毁后仍可能非空，必须同时检查两层状态。
   return Boolean(window && !window.isDestroyed() && !window.webContents.isDestroyed());
+}
+
+function focusMainWindow() {
+  if (!hasLiveWindow()) {
+    pendingWindowFocus = true;
+    return;
+  }
+  pendingWindowFocus = false;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
 }
 
 function shutdown() {
@@ -149,64 +163,74 @@ async function createWindow() {
   await window.loadURL(`http://${server.advertisedHost}:${server.port}/devtools/rn_fusebox.html?ws=${encodeURIComponent(ws)}`);
 }
 
-app.whenReady().then(async () => {
-  server = new DevToolsServer({host: process.env.HTYF_DEVTOOLS_HOST || '0.0.0.0', port: Number(process.env.HTYF_DEVTOOLS_PORT || 17654), frontendDir: path.resolve(__dirname, '../frontend-dist')});
-  await server.start();
-  ipcMain.handle('devtools:get-state', async () => {
-    const state = server.getState(true);
-    return {...state, qr: await QRCode.toDataURL(JSON.stringify(server.getPairingPayload()))};
-  });
-  ipcMain.handle('devtools:set-pairing-token', async (_event, token) => {
-    const state = server.setPairingToken(token);
-    return {...state, qr: await QRCode.toDataURL(JSON.stringify(server.getPairingPayload()))};
-  });
-  ipcMain.handle('devtools:open-runtime', (_event, runtimeId) => openRuntime(runtimeId));
-  ipcMain.handle('devtools:copy', (_event, text) => clipboard.writeText(text));
-  ipcMain.handle('devtools:environment:get', () => getEnvironmentState());
-  ipcMain.handle('devtools:environment:set', (_event, values) => setEnvironmentValues(values));
-  ipcMain.handle('devtools:environment:add', (_event, variable) => addEnvironmentVariable(variable));
-  server.on('state', state => {
-    // close 事件可能晚于 BrowserWindow 销毁，不能仅依赖 window 可选链。
-    if (!hasLiveWindow()) return;
-    window.webContents.send('devtools:state', state);
-    updateMenu(state);
-    for (const runtime of state.runtimes.filter(item => item.connected)) {
-      const compatibility = runtime.compatibility;
-      const noticeKey = `${compatibility?.status}:${compatibility?.reporterVersion || 'unknown'}:${compatibility?.desktopVersion || 'unknown'}`;
-      if (compatibilityNotices.get(runtime.runtimeId) === noticeKey) continue;
-      compatibilityNotices.set(runtime.runtimeId, noticeKey);
-      if (compatibility?.status !== 'compatible') {
-        void dialog.showMessageBox(window, {
-          type: 'warning',
-          title: '插件版本兼容性提示',
-          message: compatibility?.message || '无法确认接入插件与桌面端是否兼容。',
-          detail: `应用：${runtime.appName}\n插件：${compatibility?.reporterPackage || '未知'}\n桌面端：v${state.desktopVersion}`,
-        }).catch(error => console.warn('[desktop] compatibility notice failed', error));
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', focusMainWindow);
+  // macOS 点击 Dock 或重新打开应用时也回到已有窗口。
+  app.on('activate', focusMainWindow);
+  app.whenReady().then(async () => {
+    server = new DevToolsServer({host: process.env.HTYF_DEVTOOLS_HOST || '0.0.0.0', port: Number(process.env.HTYF_DEVTOOLS_PORT || 17654), frontendDir: path.resolve(__dirname, '../frontend-dist')});
+    await server.start();
+    ipcMain.handle('devtools:get-state', async () => {
+      const state = server.getState(true);
+      return {...state, qr: await QRCode.toDataURL(JSON.stringify(server.getPairingPayload()))};
+    });
+    ipcMain.handle('devtools:set-pairing-token', async (_event, token) => {
+      const state = server.setPairingToken(token);
+      return {...state, qr: await QRCode.toDataURL(JSON.stringify(server.getPairingPayload()))};
+    });
+    ipcMain.handle('devtools:open-runtime', (_event, runtimeId) => openRuntime(runtimeId));
+    ipcMain.handle('devtools:copy', (_event, text) => clipboard.writeText(text));
+    // 固定官网入口，不向渲染进程暴露任意 URL / 协议打开能力。
+    ipcMain.handle('devtools:open-website', () => shell.openExternal('https://mp.dagouzhi.com/'));
+    ipcMain.handle('devtools:environment:get', () => getEnvironmentState());
+    ipcMain.handle('devtools:environment:set', (_event, values) => setEnvironmentValues(values));
+    ipcMain.handle('devtools:environment:add', (_event, variable) => addEnvironmentVariable(variable));
+    server.on('state', state => {
+      // close 事件可能晚于 BrowserWindow 销毁，不能仅依赖 window 可选链。
+      if (!hasLiveWindow()) return;
+      window.webContents.send('devtools:state', state);
+      updateMenu(state);
+      for (const runtime of state.runtimes.filter(item => item.connected)) {
+        const compatibility = runtime.compatibility;
+        const noticeKey = `${compatibility?.status}:${compatibility?.reporterVersion || 'unknown'}:${compatibility?.desktopVersion || 'unknown'}`;
+        if (compatibilityNotices.get(runtime.runtimeId) === noticeKey) continue;
+        compatibilityNotices.set(runtime.runtimeId, noticeKey);
+        if (compatibility?.status !== 'compatible') {
+          void dialog.showMessageBox(window, {
+            type: 'warning',
+            title: '插件版本兼容性提示',
+            message: compatibility?.message || '无法确认接入插件与桌面端是否兼容。',
+            detail: `应用：${runtime.appName}\n插件：${compatibility?.reporterPackage || '未知'}\n桌面端：v${state.desktopVersion}`,
+          }).catch(error => console.warn('[desktop] compatibility notice failed', error));
+        }
       }
-    }
-    // 当前正在调试的应用断开后，旧 Runtime 页面不再具有有效数据源。
-    // 立即回到 Welcome，展示最新连接状态并重新生成配对信息。
-    if (activeRuntimeId) {
-      const activeRuntime = state.runtimes.find(runtime => runtime.runtimeId === activeRuntimeId);
-      if (!activeRuntime?.connected) {
-        openWelcome().catch(console.error);
-        return;
+      // 当前正在调试的应用断开后，旧 Runtime 页面不再具有有效数据源。
+      // 立即回到 Welcome，展示最新连接状态并重新生成配对信息。
+      if (activeRuntimeId) {
+        const activeRuntime = state.runtimes.find(runtime => runtime.runtimeId === activeRuntimeId);
+        if (!activeRuntime?.connected) {
+          openWelcome().catch(console.error);
+          return;
+        }
       }
-    }
-    const firstConnected = state.runtimes.find(runtime => runtime.connected);
-    if (!activeRuntimeId && firstConnected) openRuntime(firstConnected.runtimeId).catch(console.error);
+      const firstConnected = state.runtimes.find(runtime => runtime.connected);
+      if (!activeRuntimeId && firstConnected) openRuntime(firstConnected.runtimeId).catch(console.error);
+    });
+    await createWindow();
+    if (pendingWindowFocus) focusMainWindow();
+    updater.start();
+    updateMenu(server.getState());
+    if (process.env.HTYF_DEVTOOLS_DEMO === '1') startDemo();
+  }).catch(error => {
+    console.error('[desktop] failed to start', error);
+    app.exit(1);
   });
-  await createWindow();
-  updater.start();
-  updateMenu(server.getState());
-  if (process.env.HTYF_DEVTOOLS_DEMO === '1') startDemo();
-}).catch(error => {
-  console.error('[desktop] failed to start', error);
-  app.exit(1);
-});
 
-app.on('window-all-closed', () => app.quit());
-app.on('before-quit', () => { void shutdown(); });
-app.on('quit', () => { if (demoSessionDir) fs.rmSync(demoSessionDir, {recursive: true, force: true}); });
-process.once('SIGINT', () => { void handleSignal(); });
-process.once('SIGTERM', () => { void handleSignal(); });
+  app.on('window-all-closed', () => app.quit());
+  app.on('before-quit', () => { void shutdown(); });
+  app.on('quit', () => { if (demoSessionDir) fs.rmSync(demoSessionDir, {recursive: true, force: true}); });
+  process.once('SIGINT', () => { void handleSignal(); });
+  process.once('SIGTERM', () => { void handleSignal(); });
+}

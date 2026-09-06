@@ -97,8 +97,8 @@ Demo 每三秒产生一组 Console、HTTP 和 WebSocket 事件。菜单 `Demo �
 
 ### 最新包下载地址
 
-- macOS Universal：[下载 latest.dmg](https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/mac/universal/latest.dmg)
-- Windows x64：[下载 latest.exe](https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/win/x64/latest.exe)
+- macOS Universal：[下载 latest.dmg](https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/mac/latest.dmg)
+- Windows x64：[下载 latest.exe](https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/win/latest.exe)
 
 生成当前平台的未签名应用目录，用于本地验证：
 
@@ -113,19 +113,22 @@ pnpm devtools:dist:mac
 pnpm devtools:dist:win
 ```
 
-macOS 命令生成一个同时包含 Intel (`x64`) 与 Apple Silicon (`arm64`) 原生切片的 universal DMG/ZIP；Windows 命令为 `x64` 生成可选择安装目录的 NSIS 安装包和免安装 ZIP。Windows 安装包固定为所有用户安装，不再显示“所有用户/当前用户”选择页；安装时会按 Windows 规范请求管理员权限，安装后的应用本身仍以普通用户权限运行。产物按版本、系统和架构存放在 `app/release/v${version}/${os}/${arch}`：
+macOS 命令生成一个同时包含 Intel (`x64`) 与 Apple Silicon (`arm64`) 原生切片的 universal DMG/ZIP；Windows 命令为 `x64` 生成可选择安装目录的 NSIS 安装包和免安装 ZIP。Windows 安装包固定为所有用户安装，不再显示“所有用户/当前用户”选择页；安装时会按 Windows 规范请求管理员权限，安装后的应用本身仍以普通用户权限运行。安装包和更新清单按版本、系统存放在 `app/release/v${version}/${os}`：
 
 ```text
-v0.1.0/mac/universal/latest.dmg
-v0.1.0/mac/universal/latest.zip
-v0.1.0/win/x64/latest.exe
-v0.1.0/win/x64/latest.zip
+v0.1.2/mac/latest.dmg
+v0.1.2/mac/latest.zip
+v0.1.2/mac/latest-mac.yml
+v0.1.2/win/latest.exe
+v0.1.2/win/latest.zip
+v0.1.2/win/latest.yml
 ```
 
 `dist:*` 明确关闭证书自动发现，适合本地测试和内部分发。默认更新目录为：
 
 ```text
-https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/
+https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/mac/
+https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/win/
 ```
 
 需要使用其他更新服务时，可在构建时通过环境变量覆盖：
@@ -158,9 +161,9 @@ pnpm app:release:mac
 发布前验证：
 
 ```bash
-codesign --verify --deep --strict "app/release/mac-universal/红糖开发助手.app"
-xcrun stapler validate "app/release/mac-universal/红糖开发助手.app"
-spctl --assess --type execute --verbose=2 "app/release/mac-universal/红糖开发助手.app"
+codesign --verify --deep --strict "app/release/v0.1.2/mac/mac-universal/红糖开发助手.app"
+xcrun stapler validate "app/release/v0.1.2/mac/mac-universal/红糖开发助手.app"
+spctl --assess --type execute --verbose=2 "app/release/v0.1.2/mac/mac-universal/红糖开发助手.app"
 ```
 
 参考：[electron-builder 公证文档](https://www.electron.build/v26/docs/features/code-signing/notarization/)。
@@ -169,7 +172,7 @@ Windows 安装包通常可以在 macOS CI 上交叉构建；macOS 应用必须�
 
 ## 自动更新
 
-正式发布时，electron-builder 默认把 COS 地址写入 generic provider 配置，并生成 Windows `latest.yml` 与 macOS `latest-mac.yml`；`HTYF_DEVTOOLS_UPDATE_URL` 可以覆盖默认值。将安装包、ZIP、blockmap 和对应 YAML 原样上传到更新目录即可。
+正式发布时，electron-builder 默认把 OSS 地址写入 generic provider 配置，并生成 Windows `latest.yml` 与 macOS `latest-mac.yml`；`HTYF_DEVTOOLS_UPDATE_URL` 可以覆盖默认值。将 `app/release/v${version}/mac` 或 `win` 中的安装包、ZIP、blockmap 和对应 YAML 一起上传到 OSS 的 `latest/mac/` 或 `latest/win/`。版本目录用于本地归档，客户端通过固定的 latest 目录检查更新。YAML 中的文件名是相对路径，因此必须与安装包一起上传；仅上传版本目录不会更新 latest。
 
 应用启动 3 秒后检查一次，之后每 4 小时检查；更新在后台下载，完成后提示立即重启或退出时安装。菜单 `Help → 检查更新…` 支持手动检查。更新服务不可用时会安静失败，不影响调试服务。
 

@@ -17,7 +17,8 @@ test('mac release is a single universal package with branded icons', () => {
   assert.equal(windowsAppInfo.productFilename, '红糖开发助手');
   assert.equal(config.nsis.shortcutName, '红糖开发助手');
   assert.equal(config.nsis.uninstallDisplayName, '红糖开发助手');
-  assert.equal(config.artifactName, 'v${version}/${os}/${arch}/latest.${ext}');
+  assert.equal(config.directories.output, 'release/v${version}/${os}');
+  assert.equal(config.artifactName, 'latest.${ext}');
   assert.equal(config.mac.icon, 'build/icon.png');
   assert.equal(config.win.icon, 'build/icon.png');
   assert.equal(config.nsis.perMachine, true);
@@ -49,7 +50,7 @@ test('release config uses the default OSS update endpoint', () => {
   const config = require(configPath);
   assert.deepEqual(config.publish, [{
     provider: 'generic',
-    url: 'https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest',
+    url: `https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/${process.platform === 'darwin' ? 'mac' : process.platform === 'win32' ? 'win' : process.platform}`,
   }]);
   if (previous !== undefined) process.env.HTYF_DEVTOOLS_UPDATE_URL = previous;
   delete require.cache[configPath];

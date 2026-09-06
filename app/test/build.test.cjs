@@ -11,9 +11,9 @@ function runBuild(args, env = {}, localCredentials) {
     if (name === 'node:child_process') {
       return {spawnSync: (_command, argv, options) => { result.argv = argv; result.env = options.env; return {status: 0}; }};
     }
-    if (name === 'node:fs' && localCredentials) {
+    if (name === 'node:fs') {
       return {
-        existsSync: file => file.endsWith('notarization.local.json'),
+        existsSync: file => Boolean(localCredentials) && file.endsWith('notarization.local.json'),
         readFileSync: () => JSON.stringify(localCredentials),
       };
     }
