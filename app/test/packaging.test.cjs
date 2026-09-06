@@ -37,7 +37,7 @@ test('release config emits generic update metadata when an update URL is provide
   delete require.cache[configPath];
 });
 
-test('release config uses the default COS update endpoint', () => {
+test('release config uses the default OSS update endpoint', () => {
   const configPath = require.resolve('../electron-builder.config.cjs');
   const previous = process.env.HTYF_DEVTOOLS_UPDATE_URL;
   delete process.env.HTYF_DEVTOOLS_UPDATE_URL;
@@ -45,7 +45,7 @@ test('release config uses the default COS update endpoint', () => {
   const config = require(configPath);
   assert.deepEqual(config.publish, [{
     provider: 'generic',
-    url: 'http://oss.dagouzhi.com/com.dagouzhi.mp.devtools/latest',
+    url: 'https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest',
   }]);
   if (previous !== undefined) process.env.HTYF_DEVTOOLS_UPDATE_URL = previous;
   delete require.cache[configPath];

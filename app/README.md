@@ -97,8 +97,8 @@ Demo 每三秒产生一组 Console、HTTP 和 WebSocket 事件。菜单 `Demo �
 
 ### 最新包下载地址
 
-- macOS Universal：[下载 latest.dmg](http://oss.dagouzhi.com/com.dagouzhi.mp.devtools/latest/mac/universal/latest.dmg)
-- Windows x64：[下载 latest.exe](http://oss.dagouzhi.com/com.dagouzhi.mp.devtools/latest/win/x64/latest.exe)
+- macOS Universal：[下载 latest.dmg](https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/mac/universal/latest.dmg)
+- Windows x64：[下载 latest.exe](https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/win/x64/latest.exe)
 
 生成当前平台的未签名应用目录，用于本地验证：
 
@@ -125,7 +125,7 @@ v0.1.0/win/x64/latest.zip
 `dist:*` 明确关闭证书自动发现，适合本地测试和内部分发。默认更新目录为：
 
 ```text
-http://oss.dagouzhi.com/com.dagouzhi.mp.devtools/latest/
+https://dagouzhi.oss-cn-qingdao.aliyuncs.com/com.dagouzhi.mp.devtools/latest/
 ```
 
 需要使用其他更新服务时，可在构建时通过环境变量覆盖：
