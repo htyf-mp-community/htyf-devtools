@@ -8,7 +8,7 @@ module.exports = {
   asar: true,
   directories: {output: 'release', buildResources: 'build'},
   files: ['src/**/*', 'frontend-dist/**/*', 'package.json'],
-  artifactName: 'v${version}/${os}/${arch}/latest.${ext}',
+  artifactName: 'v${version}/${os}/latest.${ext}',
   publish: [{provider: 'generic', url: updateUrl}],
   generateUpdatesFilesForAllChannels: true,
   dmg: {title: '红糖开发助手'},
