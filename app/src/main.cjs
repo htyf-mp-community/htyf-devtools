@@ -86,6 +86,17 @@ function updateMenu(state) {
       {label: '系统环境变量…', accelerator: 'CmdOrCtrl+,', click: openEnvironmentWindow},
       {type: 'separator'}, {label: '退出红糖开发助手', role: 'quit'},
     ]},
+    // 自定义应用菜单需保留原生编辑角色，macOS 才能将快捷键交给当前焦点窗口。
+    {label: '编辑', submenu: [
+      {label: '撤销', role: 'undo'},
+      {label: '重做', role: 'redo'},
+      {type: 'separator'},
+      {label: '剪切', role: 'cut'},
+      {label: '复制', role: 'copy'},
+      {label: '粘贴', role: 'paste'},
+      {type: 'separator'},
+      {label: '全选', role: 'selectAll'},
+    ]},
     {label: '运行时', submenu: runtimes.length ? runtimes : [{label: '暂无已连接应用', enabled: false}]},
     {label: '演示', submenu: [
       {label: demoRuntime ? '演示正在运行' : '启动演示运行时', accelerator: 'CmdOrCtrl+Shift+D', enabled: !demoRuntime, click: startDemo},

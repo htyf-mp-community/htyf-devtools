@@ -1,6 +1,6 @@
 const {contextBridge, ipcRenderer} = require('electron');
 
-// 仅暴露 Welcome 所需的窄接口；renderer 无法直接访问 Node 或 Electron。
+// 仅暴露桌面前端所需的窄接口；renderer 无法直接访问 Node 或 Electron。
 contextBridge.exposeInMainWorld('devtoolsHost', {
   getState: () => ipcRenderer.invoke('devtools:get-state'),
   setPairingToken: token => ipcRenderer.invoke('devtools:set-pairing-token', token),

@@ -21,6 +21,17 @@ if (!fs.existsSync(upstreamWelcome)) {
 // 直接替换上游 Welcome 模块，避免运行时注入、DOM 隐藏和重绘时序问题。
 fs.copyFileSync(path.resolve(__dirname, '../src/htyf-rn-welcome.js'), upstreamWelcome);
 
+const hostPath = path.join(destination, 'core/host/host.js');
+let host = fs.readFileSync(hostPath, 'utf8');
+const browserCopy = 'copyText(e){null!=e&&navigator.clipboard.writeText(e)}';
+if (host.split(browserCopy).length !== 2) {
+  throw new Error('Unsupported debugger frontend: clipboard host marker not found or ambiguous');
+}
+// 局域网 HTTP 页面没有浏览器 Clipboard API，面板复制统一走 Electron 的窄接口。
+// 保留浏览器模式的原有行为，不改变 Network 等面板生成的复制内容。
+host = host.replace(browserCopy, 'copyText(e){if(null!=e)return window.devtoolsHost?.copy?window.devtoolsHost.copy(e):navigator.clipboard.writeText(e)}');
+fs.writeFileSync(hostPath, host);
+
 const entryPath = path.join(destination, 'entrypoints/rn_fusebox/rn_fusebox.js');
 let entry = fs.readFileSync(entryPath, 'utf8');
 const removeSection = (source, startMarker, endMarker, label) => {
