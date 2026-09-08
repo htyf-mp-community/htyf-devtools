@@ -23,7 +23,7 @@ function launch(hasLock) {
     show() { calls.push('show'); }
     focus() { calls.push('focus'); }
     once() {}
-    async loadURL() {}
+    async loadFile() {}
   }
   const context = vm.createContext({
     require(name) {

@@ -16,8 +16,10 @@ let activeRuntimeId;
 let demoRuntime;
 let shutdownPromise;
 let pendingWindowFocus = false;
+let loadedFrontendEndpoint;
 const updater = createAutoUpdateController(() => window);
 const compatibilityNotices = new Map();
+const frontendFile = path.resolve(__dirname, '../frontend-dist/rn_fusebox.html');
 const demoSessionDir = hasSingleInstanceLock && process.env.HTYF_DEVTOOLS_DEMO === '1' ? path.join(app.getPath('temp'), `htyf-devtools-demo-${process.pid}`) : undefined;
 if (demoSessionDir) app.setPath('sessionData', demoSessionDir);
 
@@ -67,6 +69,22 @@ function stopDemo() {
   updateMenu(server.getState());
 }
 
+function getFrontendEndpoint() {
+  return `${server.advertisedHost}:${server.port}`;
+}
+
+async function loadFrontend(query) {
+  await window.loadFile(frontendFile, {query});
+  loadedFrontendEndpoint = getFrontendEndpoint();
+}
+
+async function syncFrontendEndpoint() {
+  if (!hasLiveWindow() || loadedFrontendEndpoint === getFrontendEndpoint()) return;
+  const runtime = activeRuntimeId && server.getState().runtimes.find(item => item.runtimeId === activeRuntimeId && item.connected);
+  if (runtime) await openRuntime(runtime.runtimeId);
+  else await openWelcome();
+}
+
 async function openRuntime(runtimeId) {
   if (!hasLiveWindow()) return;
   activeRuntimeId = runtimeId;
@@ -75,7 +93,7 @@ async function openRuntime(runtimeId) {
   const compatibilityLabel = runtime?.compatibility?.status === 'compatible' ? '兼容' : '需检查';
   window.setTitle(`红糖开发助手 — ${runtime?.appName || runtimeId} · ${versionLabel} · ${compatibilityLabel}`);
   const ws = `${server.advertisedHost}:${server.port}/cdp/${encodeURIComponent(runtimeId)}`;
-  await window.loadURL(`http://${server.advertisedHost}:${server.port}/devtools/rn_fusebox.html?ws=${encodeURIComponent(ws)}&panel=network`);
+  await loadFrontend({ws, panel: 'network'});
 }
 
 async function openWelcome() {
@@ -83,7 +101,7 @@ async function openWelcome() {
   activeRuntimeId = undefined;
   window.setTitle('红糖开发助手 — 欢迎');
   const ws = `${server.advertisedHost}:${server.port}/cdp/welcome`;
-  await window.loadURL(`http://${server.advertisedHost}:${server.port}/devtools/rn_fusebox.html?ws=${encodeURIComponent(ws)}`);
+  await loadFrontend({ws});
 }
 
 function updateMenu(state) {
@@ -160,7 +178,7 @@ async function createWindow() {
   });
   window.once('closed', () => { window = undefined; });
   const ws = `${server.advertisedHost}:${server.port}/cdp/welcome`;
-  await window.loadURL(`http://${server.advertisedHost}:${server.port}/devtools/rn_fusebox.html?ws=${encodeURIComponent(ws)}`);
+  await loadFrontend({ws});
 }
 
 if (!hasSingleInstanceLock) {
@@ -171,6 +189,7 @@ if (!hasSingleInstanceLock) {
   app.on('activate', focusMainWindow);
   app.whenReady().then(async () => {
     server = new DevToolsServer({host: process.env.HTYF_DEVTOOLS_HOST || '0.0.0.0', port: Number(process.env.HTYF_DEVTOOLS_PORT || 17654), frontendDir: path.resolve(__dirname, '../frontend-dist')});
+    server.on('listening', () => { void syncFrontendEndpoint().catch(console.error); });
     await server.start();
     ipcMain.handle('devtools:get-state', async () => {
       const state = server.getState(true);
@@ -211,7 +230,11 @@ if (!hasSingleInstanceLock) {
       if (activeRuntimeId) {
         const activeRuntime = state.runtimes.find(runtime => runtime.runtimeId === activeRuntimeId);
         if (!activeRuntime?.connected) {
-          openWelcome().catch(console.error);
+          activeRuntimeId = undefined;
+          // 网络切换通常会先表现为 Runtime WebSocket 断开；此时才重新检查局域网地址。
+          void server.refreshAdvertisedHost()
+            .then(changed => { if (!changed) return openWelcome(); })
+            .catch(console.error);
           return;
         }
       }

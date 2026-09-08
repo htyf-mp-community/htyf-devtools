@@ -19,7 +19,7 @@ test('website bridge opens only the official URL and propagates browser failures
     BrowserWindow: class {
       webContents = {on() {}};
       once() {}
-      async loadURL() {}
+      async loadFile() {}
     },
     Menu: {buildFromTemplate: value => value, setApplicationMenu() {}},
   };

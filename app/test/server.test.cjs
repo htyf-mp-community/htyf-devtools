@@ -41,9 +41,12 @@ test('uses a non-loopback Windows adapter when systeminformation marks every ada
 
 test('starts in localhost-only mode instead of exiting when no LAN IPv4 is available', async () => {
   const server = new DevToolsServer({host: '0.0.0.0', port: 0, networkInterfacesProvider: async () => []});
+  const listening = new Promise(resolve => server.once('listening', resolve));
   await server.start();
+  const endpointState = await listening;
   assert.equal(server.advertisedHost, 'localhost');
   assert.equal(server.getState().lanAvailable, false);
+  assert.equal(endpointState.url, `http://localhost:${server.port}`);
   await server.stop();
 });
 
@@ -63,6 +66,29 @@ test('advertises the systeminformation address instead of loopback', async () =>
   await server.start();
   assert.equal(server.getState().reporterUrl, `ws://192.168.10.8:${server.port}/reporter`);
   await server.stop();
+});
+
+test('publishes a new endpoint when the active LAN address changes', async () => {
+  let inspection = 0;
+  const networkInterfacesProvider = async () => [{
+    ip4: inspection++ === 0 ? '192.168.3.17' : '192.168.3.18',
+    internal: false,
+    virtual: false,
+    operstate: 'up',
+    default: true,
+  }];
+  const server = new DevToolsServer({host: '0.0.0.0', port: 0, networkInterfacesProvider});
+  try {
+    await server.start();
+    assert.equal(server.advertisedHost, '192.168.3.17');
+    const endpointChanged = new Promise(resolve => server.once('listening', resolve));
+    assert.equal(await server.refreshAdvertisedHost(), true);
+    const changed = await endpointChanged;
+    assert.equal(changed.url, `http://192.168.3.18:${server.port}`);
+    assert.equal(server.advertisedHost, '192.168.3.18');
+  } finally {
+    await server.stop();
+  }
 });
 
 test('selects another port when the requested desktop port is occupied', async () => {

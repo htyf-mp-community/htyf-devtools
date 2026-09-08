@@ -104,13 +104,7 @@ class DevToolsServer extends EventEmitter {
 
   async start() {
     // 监听地址与展示地址分离：0.0.0.0 用于接收真机连接，advertisedHost 用于 URL/二维码。
-    let lanAddress;
-    if (this.host === '0.0.0.0') {
-      try { lanAddress = selectNetworkAddress(await this.networkInterfacesProvider()); }
-      catch (error) { console.warn('[server] unable to inspect LAN interfaces; using localhost mode', error); }
-    }
-    this.advertisedHost = this.host === '0.0.0.0' ? lanAddress || 'localhost' : this.host;
-    this.lanAvailable = this.host === '0.0.0.0' ? Boolean(lanAddress) : !['127.0.0.1', 'localhost', '::1'].includes(this.host);
+    await this.refreshAdvertisedHost({initial: true});
     // port=0 明确表示由操作系统分配随机端口，主要用于测试和临时实例。
     // 其他端口先通过 portfinder 探测，占用时从目标端口开始向后寻找。
     if (this.port !== 0) {
@@ -140,7 +134,37 @@ class DevToolsServer extends EventEmitter {
     this.port = typeof address === 'object' ? address.port : this.port;
     this.heartbeatSweep = setInterval(() => this.expireStaleRuntimes(), this.heartbeatSweepMs);
     this.heartbeatSweep.unref?.();
-    return this.getState();
+    const state = this.getState();
+    this.emit('listening', state);
+    return state;
+  }
+
+  async refreshAdvertisedHost({initial = false} = {}) {
+    if (this.refreshingNetwork) return false;
+    this.refreshingNetwork = true;
+    try {
+      let lanAddress;
+      if (this.host === '0.0.0.0') {
+        try { lanAddress = selectNetworkAddress(await this.networkInterfacesProvider()); }
+        catch (error) {
+          console.warn('[server] unable to inspect LAN interfaces; keeping current address', error);
+          return false;
+        }
+      }
+      const advertisedHost = this.host === '0.0.0.0' ? lanAddress || 'localhost' : this.host;
+      const lanAvailable = this.host === '0.0.0.0' ? Boolean(lanAddress) : !['127.0.0.1', 'localhost', '::1'].includes(this.host);
+      const changed = advertisedHost !== this.advertisedHost || lanAvailable !== this.lanAvailable;
+      this.advertisedHost = advertisedHost;
+      this.lanAvailable = lanAvailable;
+      if (changed && !initial) {
+        const state = this.getState();
+        this.emit('state', state);
+        this.emit('listening', state);
+      }
+      return changed;
+    } finally {
+      this.refreshingNetwork = false;
+    }
   }
 
   expireStaleRuntimes() {
