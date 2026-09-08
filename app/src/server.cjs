@@ -81,7 +81,7 @@ const COMPAT_NOOP_METHODS = new Set([
 ]);
 
 class DevToolsServer extends EventEmitter {
-  constructor({host = '127.0.0.1', port = 17654, frontendDir, requirePairing, pairingToken, desktopVersion = DEFAULT_DESKTOP_VERSION, maxPayloadBytes = 1024 * 1024, heartbeatIntervalMs = 15000, heartbeatTimeoutMs = 45000, heartbeatSweepMs = 5000, networkInterfacesProvider = systeminformation.networkInterfaces} = {}) {
+  constructor({host = '127.0.0.1', port = 17654, frontendDir, requirePairing, pairingToken, desktopVersion = DEFAULT_DESKTOP_VERSION, maxPayloadBytes = 0, heartbeatIntervalMs = 15000, heartbeatTimeoutMs = 45000, heartbeatSweepMs = 5000, networkInterfacesProvider = systeminformation.networkInterfaces} = {}) {
     super();
     this.host = host;
     this.port = port;
@@ -94,6 +94,8 @@ class DevToolsServer extends EventEmitter {
     this.frontendDir = frontendDir;
     this.requirePairing = requirePairing ?? host === '0.0.0.0';
     this.pairingToken = pairingToken ?? '123456';
+    // ws 的 maxPayload=0 表示不限制接收消息大小，允许完整接收大正文和调试命令。
+    // 消息仍会在内存中组装和解析；需要控制内存占用时可显式传入字节上限，对两类连接生效。
     this.maxPayloadBytes = maxPayloadBytes;
     this.heartbeatIntervalMs = heartbeatIntervalMs;
     this.heartbeatTimeoutMs = heartbeatTimeoutMs;
@@ -116,7 +118,7 @@ class DevToolsServer extends EventEmitter {
     }
     this.httpServer = http.createServer((request, response) => this.handleHttp(request, response));
     this.reporterServer = new WebSocketServer({noServer: true, maxPayload: this.maxPayloadBytes});
-    this.cdpServer = new WebSocketServer({noServer: true, maxPayload: 256 * 1024});
+    this.cdpServer = new WebSocketServer({noServer: true, maxPayload: this.maxPayloadBytes});
     this.httpServer.on('upgrade', (request, socket, head) => {
       const url = new URL(request.url, `http://${request.headers.host}`);
       if (url.pathname === '/reporter') {
@@ -259,6 +261,8 @@ class DevToolsServer extends EventEmitter {
   }
 
   handleReporter(socket) {
+    // ws 会关闭协议错误连接；监听 error，避免错误导致主进程退出。
+    socket.on('error', error => console.warn('[server] reporter WebSocket error', error.code, error.message));
     // Reporter 必须先发送 runtime.hello；在完成版本、身份和 token 校验前不接受业务事件。
     let runtimeId;
     socket.on('message', raw => {
@@ -304,6 +308,7 @@ class DevToolsServer extends EventEmitter {
   }
 
   handleCdp(socket, runtimeId) {
+    socket.on('error', error => console.warn('[server] CDP WebSocket error', error.code, error.message));
     // 每个 DevTools 前端独立订阅 Domain，未 enable 的 Domain 不推送事件。
     if (!this.cdpClients.has(runtimeId)) this.cdpClients.set(runtimeId, new Set());
     this.cdpClients.get(runtimeId).add(socket);

@@ -4,6 +4,49 @@ const http = require('node:http');
 const WebSocket = require('ws');
 const {DevToolsServer, selectNetworkAddress, evaluateCompatibility} = require('../src/server.cjs');
 const {DemoRuntime} = require('../src/demo-runtime.cjs');
+const {once} = require('node:events');
+
+for (const route of ['reporter', 'cdp/large']) {
+  test(`${route} accepts messages above the former payload limit`, {timeout: 5000}, async t => {
+    const server = new DevToolsServer({port: 0});
+    await server.start();
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/${route}`);
+    t.after(async () => { socket.terminate(); await server.stop(); });
+    await once(socket, 'open');
+    // 中文 UTF-8 和 JSON 转义后的消息约 3 MB，超过原来的两种接收上限。
+    const largeText = '中"'.repeat(600_000);
+    const message = route === 'reporter'
+      ? {protocolVersion: 1, type: 'runtime.hello', runtimeId: 'large', payload: {runtimeId: 'large', appName: largeText}}
+      : {id: 1, method: 'Runtime.evaluate', params: {expression: largeText}};
+    const response = once(socket, 'message');
+    const closed = new Promise((_, reject) => socket.once('close', code => reject(new Error(`Unexpected close: ${code}`))));
+    socket.send(JSON.stringify(message));
+    const [raw] = await Promise.race([response, closed]);
+    const result = JSON.parse(raw.toString());
+    if (route === 'reporter') {
+      assert.equal(result.type, 'runtime.welcome');
+      assert.equal(server.runtimes.get('large').appName, largeText);
+    } else assert.deepEqual(result, {id: 1, result: {result: {type: 'undefined'}}});
+  });
+
+  test(`${route} handles protocol errors without an uncaught exception`, {timeout: 5000}, async t => {
+    const server = new DevToolsServer({port: 0});
+    await server.start();
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/${route}`);
+    t.after(async () => { socket.terminate(); await server.stop(); });
+    await once(socket, 'open');
+    const closed = once(socket, 'close');
+    const cdpSocket = server.cdpClients.get('large')?.values().next().value;
+    const serverClosed = cdpSocket && new Promise(resolve => cdpSocket.once('close', resolve));
+    // Invalid UTF-8 in a text frame triggers the same Receiver -> socket error path.
+    socket.send(Buffer.from([0xff]), {binary: false});
+    const [code] = await closed;
+    await serverClosed;
+    assert.equal(code, 1007);
+    assert.equal(server.cdpClients.get('large')?.size ?? 0, 0);
+    assert.equal((await get(`http://127.0.0.1:${server.port}/json/list`)).status, 200);
+  });
+}
 
 function get(url) {
   return new Promise((resolve, reject) => http.get(url, response => {
