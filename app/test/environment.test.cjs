@@ -46,3 +46,93 @@ test('environment manager restricts direct OS writes to the JSON whitelist', () 
   assert.match(source, /function addEnvironmentVariable/);
   assert.ok(read('src/environment.html').includes('＋ 添加环境变量'));
 });
+
+function createManager(t, options = {}) {
+  const vm = require('node:vm');
+  const os = require('node:os');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'devtools-environment-'));
+  t.after(() => fs.rmSync(directory, {recursive: true, force: true}));
+  const system = new Map();
+  const writes = [];
+  const context = {
+    module: {exports: {}}, console,
+    process: {platform: 'win32', env: {}},
+    require(id) {
+      if (id === 'electron') return {app: {getPath: () => directory}};
+      if (id === './environment-variables.json') return {variables: [{key: 'TEST_ENV', description: 'test'}, {key: 'OTHER_ENV', description: 'other'}]};
+      if (id === 'node:child_process') return {execFileSync(command, args) {
+        if (command !== 'reg.exe') return '';
+        const key = args[3];
+        if (args[0] === 'query') { if (!system.has(key)) throw new Error('missing'); return `    ${key}    REG_SZ    ${system.get(key)}\n`; }
+        if (options.failWrites) throw new Error('write failed');
+        if (args[0] === 'delete') system.delete(key);
+        else { system.set(key, args[7]); writes.push(args[7]); }
+        return '';
+      }};
+      return require(id);
+    },
+  };
+  const reload = () => { context.module = {exports: {}}; vm.runInNewContext(read('src/environment.cjs'), {...context}); return context.module.exports; };
+  return {manager: reload(), reload, system, writes, directory};
+}
+
+test('saved history trims, deduplicates, orders recent values and survives reload and deletion', t => {
+  const {manager, reload, system, writes} = createManager(t);
+  system.set('TEST_ENV', ' original ');
+  manager.setEnvironmentValues({TEST_ENV: ' first '});
+  manager.setEnvironmentValues({TEST_ENV: 'second'});
+  manager.setEnvironmentValues({TEST_ENV: ' first\n', OTHER_ENV: 'first'});
+  assert.deepEqual(writes, ['first', 'second', 'first', 'first']);
+  const history = JSON.parse(JSON.stringify(reload().getEnvironmentState().history));
+  assert.deepEqual(history, {TEST_ENV: ['first', 'second', 'original'], OTHER_ENV: ['first']});
+  manager.setEnvironmentValues({TEST_ENV: null});
+  assert.equal(system.has('TEST_ENV'), false);
+  assert.deepEqual(JSON.parse(JSON.stringify(reload().getEnvironmentState().history)), history);
+  manager.setEnvironmentValues({TEST_ENV: '   '});
+  assert.equal(system.get('TEST_ENV'), '');
+  assert.equal(reload().getEnvironmentState().history.TEST_ENV[0], '');
+});
+
+test('invalid requests and failed writes do not record unsaved values', t => {
+  const {manager, directory} = createManager(t, {failWrites: true});
+  assert.throws(() => manager.setEnvironmentValues({TEST_ENV: 'x', UNKNOWN: 'y'}), /不允许修改/);
+  assert.throws(() => manager.setEnvironmentValues({TEST_ENV: 12}), /字符串/);
+  assert.throws(() => manager.setEnvironmentValues({TEST_ENV: 'x'}), /无法写入/);
+  assert.equal(fs.existsSync(path.join(directory, 'environment-values.history.json')), false);
+});
+
+test('history loading normalizes legacy values and tolerates invalid files', t => {
+  const {manager, directory} = createManager(t);
+  const file = path.join(directory, 'environment-values.history.json');
+  fs.writeFileSync(file, JSON.stringify({history: {TEST_ENV: [' a ', 'a', 42, ' b ', ''], OTHER_ENV: null}}));
+  assert.deepEqual(JSON.parse(JSON.stringify(manager.getEnvironmentState().history)), {TEST_ENV: ['a', 'b', '']});
+  fs.writeFileSync(file, '{');
+  assert.deepEqual(JSON.parse(JSON.stringify(manager.getEnvironmentState().history)), {});
+});
+
+test('custom variables can be deleted persistently while defaults are protected and history retained', t => {
+  const {manager, reload, system} = createManager(t);
+  manager.addEnvironmentVariable({key: 'CUSTOM_ENV', description: 'custom'});
+  manager.setEnvironmentValues({CUSTOM_ENV: ' saved '});
+  assert.throws(() => manager.deleteEnvironmentVariable('TEST_ENV'), /默认环境变量不能删除/);
+  assert.throws(() => manager.deleteEnvironmentVariable('UNKNOWN'), /不存在/);
+  assert.throws(() => manager.deleteEnvironmentVariable('../bad'), /名称无效/);
+  manager.deleteEnvironmentVariable('CUSTOM_ENV');
+  assert.equal(system.has('CUSTOM_ENV'), false);
+  const state = reload().getEnvironmentState();
+  assert.equal(state.variables.some(item => item.key === 'CUSTOM_ENV'), false);
+  assert.equal(state.history.CUSTOM_ENV[0], 'saved');
+  assert.equal(state.variables.some(item => item.key === 'TEST_ENV'), true);
+  manager.addEnvironmentVariable({key: 'CUSTOM_ENV', description: ''});
+  assert.equal(manager.getEnvironmentState().history.CUSTOM_ENV[0], 'saved');
+  manager.deleteEnvironmentVariable('CUSTOM_ENV');
+});
+
+test('failed system deletion retains the custom variable configuration', t => {
+  const {manager, system, reload} = createManager(t, {failWrites: true});
+  manager.addEnvironmentVariable({key: 'CUSTOM_ENV', description: ''});
+  system.set('CUSTOM_ENV', 'existing');
+  assert.throws(() => manager.deleteEnvironmentVariable('CUSTOM_ENV'), /无法删除/);
+  assert.equal(system.get('CUSTOM_ENV'), 'existing');
+  assert.equal(reload().getEnvironmentState().variables.some(item => item.key === 'CUSTOM_ENV'), true);
+});

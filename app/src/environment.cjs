@@ -14,6 +14,27 @@ const ENVIRONMENT_KEYS = Object.freeze(ENVIRONMENT_VARIABLES.map(item => item.ke
 if (new Set(ENVIRONMENT_KEYS).size !== ENVIRONMENT_KEYS.length) throw new Error('environment-variables.json 包含重复变量');
 
 const customConfigPath = () => path.join(app.getPath('userData'), 'environment-variables.user.json');
+const historyPath = () => path.join(app.getPath('userData'), 'environment-values.history.json');
+
+function readHistory() {
+  try {
+    const {history} = JSON.parse(fs.readFileSync(historyPath(), 'utf8'));
+    if (!history || typeof history !== 'object' || Array.isArray(history)) return {};
+    return Object.fromEntries(Object.entries(history)
+      .filter(([key, values]) => ENVIRONMENT_KEY_PATTERN.test(key) && Array.isArray(values))
+      .map(([key, values]) => [key, [...new Set(values.filter(value => typeof value === 'string').map(value => value.trim()))]]));
+  } catch (error) {
+    if (error.code !== 'ENOENT') console.warn('[environment] ignored invalid value history', error.message);
+    return {};
+  }
+}
+
+function saveHistory(history) {
+  fs.mkdirSync(path.dirname(historyPath()), {recursive: true});
+  const temporary = `${historyPath()}.tmp`;
+  fs.writeFileSync(temporary, `${JSON.stringify({version: 1, history}, null, 2)}\n`, {mode: 0o600});
+  fs.renameSync(temporary, historyPath());
+}
 
 function validateVariable(variable) {
   if (!variable || !ENVIRONMENT_KEY_PATTERN.test(variable.key) || typeof variable.description !== 'string') {
@@ -43,10 +64,24 @@ function addEnvironmentVariable(variable) {
   const variables = getVariables();
   if (variables.some(item => item.key === normalized.key)) throw new Error(`${normalized.key} 已存在`);
   const custom = [...readCustomVariables(), normalized];
+  saveCustomVariables(custom);
+  return getEnvironmentState();
+}
+
+function saveCustomVariables(custom) {
   fs.mkdirSync(path.dirname(customConfigPath()), {recursive: true});
   const temporary = `${customConfigPath()}.tmp`;
   fs.writeFileSync(temporary, `${JSON.stringify({version: 1, variables: custom}, null, 2)}\n`, {mode: 0o600});
   fs.renameSync(temporary, customConfigPath());
+}
+
+function deleteEnvironmentVariable(key) {
+  if (typeof key !== 'string' || !ENVIRONMENT_KEY_PATTERN.test(key)) throw new Error('环境变量名称无效');
+  if (ENVIRONMENT_KEYS.includes(key)) throw new Error('默认环境变量不能删除');
+  const custom = readCustomVariables();
+  if (!custom.some(item => item.key === key)) throw new Error(`${key} 不存在`);
+  setEnvironmentValues({[key]: null});
+  saveCustomVariables(custom.filter(item => item.key !== key));
   return getEnvironmentState();
 }
 
@@ -88,7 +123,9 @@ function broadcastWindowsEnvironmentChange() {
 }
 
 function writeWindowsValue(key, value) {
-  if (value === null) run('reg.exe', ['delete', 'HKCU\\Environment', '/v', key, '/f']);
+  if (value === null) {
+    if (readWindowsValue(key).exists) runRequired('reg.exe', ['delete', 'HKCU\\Environment', '/v', key, '/f'], `无法删除 ${key}`);
+  }
   else runRequired('reg.exe', ['add', 'HKCU\\Environment', '/v', key, '/t', 'REG_SZ', '/d', value, '/f'], `无法写入 ${key}`);
   if (value === null) delete process.env[key]; else process.env[key] = value;
 }
@@ -97,7 +134,7 @@ function writeMacValue(key, value) {
   const file = launchAgentPath(key);
   run('/bin/launchctl', ['bootout', `gui/${process.getuid()}`, file]);
   if (value === null) {
-    run('/bin/launchctl', ['unsetenv', key]);
+    runRequired('/bin/launchctl', ['unsetenv', key], `无法删除 ${key}`);
     try { fs.unlinkSync(file); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     delete process.env[key];
     return;
@@ -123,6 +160,7 @@ function getEnvironmentState() {
     supported: process.platform === 'win32' || process.platform === 'darwin',
     restartRequired: true,
     variables,
+    history: readHistory(),
     values: Object.fromEntries(variables.map(({key}) => [key, readValue(key)])),
   };
 }
@@ -134,9 +172,20 @@ function setEnvironmentValues(values) {
     if (!allowedKeys.has(key)) throw new Error(`不允许修改环境变量 ${key}`);
     if (value !== null && typeof value !== 'string') throw new TypeError(`${key} 必须是字符串或 null`);
   }
-  for (const [key, value] of Object.entries(values)) writeValue(key, value);
+  const history = readHistory();
+  for (const [key, value] of Object.entries(values)) {
+    const normalized = value === null ? null : value.trim();
+    const previous = readValue(key);
+    writeValue(key, normalized);
+    const candidates = [...(previous.exists ? [previous.value.trim()] : []), ...(history[key] || [])];
+    if (normalized !== null) candidates.unshift(normalized);
+    if (candidates.length) {
+      history[key] = [...new Set(candidates)];
+      saveHistory(history);
+    }
+  }
   if (process.platform === 'win32') broadcastWindowsEnvironmentChange();
   return getEnvironmentState();
 }
 
-module.exports = {ENVIRONMENT_VARIABLES, ENVIRONMENT_KEYS, getEnvironmentState, setEnvironmentValues, addEnvironmentVariable};
+module.exports = {ENVIRONMENT_VARIABLES, ENVIRONMENT_KEYS, getEnvironmentState, setEnvironmentValues, addEnvironmentVariable, deleteEnvironmentVariable};

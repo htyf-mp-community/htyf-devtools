@@ -2,8 +2,12 @@
   "version": 1,
   "variables": [
     {
-      "key": "HTYF_DEVTOOLS_TEST_ENV",
-      "description": "测试环境设置"
+      "key": "HTYF_DEVTOOLS_ENDPOINT",
+      "description": "红糖云服调试服务地址"
+    },
+    {
+      "key": "HTYF_DEVTOOLS_TOKEN",
+      "description": "红糖云服调试服务连接凭证"
     }
   ]
 }

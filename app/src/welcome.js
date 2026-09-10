@@ -34,3 +34,15 @@ document.querySelector('#copy').onclick = async event => {
   }
   setTimeout(() => { button.textContent = '复制连接配置'; }, 1600);
 };
+
+document.querySelector('#environment').onclick = async event => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  try {
+    await window.devtoolsHost.openEnvironment();
+  } catch {
+    button.textContent = '打开失败，请重试';
+  } finally {
+    button.disabled = false;
+  }
+};

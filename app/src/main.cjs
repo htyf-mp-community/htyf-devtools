@@ -7,7 +7,7 @@ const QRCode = require('qrcode');
 const {DevToolsServer} = require('./server.cjs');
 const {DemoRuntime} = require('./demo-runtime.cjs');
 const {createAutoUpdateController} = require('./updater.cjs');
-const {getEnvironmentState, setEnvironmentValues, addEnvironmentVariable} = require('./environment.cjs');
+const {getEnvironmentState, setEnvironmentValues, addEnvironmentVariable, deleteEnvironmentVariable} = require('./environment.cjs');
 
 let window;
 let environmentWindow;
@@ -204,8 +204,25 @@ if (!hasSingleInstanceLock) {
     // 固定官网入口，不向渲染进程暴露任意 URL / 协议打开能力。
     ipcMain.handle('devtools:open-website', () => shell.openExternal('https://mp.dagouzhi.com/'));
     ipcMain.handle('devtools:environment:get', () => getEnvironmentState());
+    ipcMain.handle('devtools:environment:open', () => openEnvironmentWindow());
     ipcMain.handle('devtools:environment:set', (_event, values) => setEnvironmentValues(values));
     ipcMain.handle('devtools:environment:add', (_event, variable) => addEnvironmentVariable(variable));
+    ipcMain.handle('devtools:environment:delete', async (event, key) => {
+      const parent = BrowserWindow.fromWebContents(event.sender);
+      if (!parent || parent.isDestroyed()) return null;
+      const {response} = await dialog.showMessageBox(parent, {
+        type: 'warning',
+        title: '删除环境变量',
+        message: `确定删除环境变量 ${key}？`,
+        detail: '将从列表和系统中删除此变量，历史值会保留。删除后需重启目标应用才能生效。',
+        buttons: ['取消', '删除'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      if (response !== 1) return null;
+      return deleteEnvironmentVariable(key);
+    });
     server.on('state', state => {
       // close 事件可能晚于 BrowserWindow 销毁，不能仅依赖 window 可选链。
       if (!hasLiveWindow()) return;

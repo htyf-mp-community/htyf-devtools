@@ -7,9 +7,11 @@ contextBridge.exposeInMainWorld('devtoolsHost', {
   openRuntime: runtimeId => ipcRenderer.invoke('devtools:open-runtime', runtimeId),
   copy: text => ipcRenderer.invoke('devtools:copy', text),
   openWebsite: () => ipcRenderer.invoke('devtools:open-website'),
+  openEnvironment: () => ipcRenderer.invoke('devtools:environment:open'),
   getEnvironment: () => ipcRenderer.invoke('devtools:environment:get'),
   setEnvironment: values => ipcRenderer.invoke('devtools:environment:set', values),
   addEnvironmentVariable: variable => ipcRenderer.invoke('devtools:environment:add', variable),
+  deleteEnvironmentVariable: key => ipcRenderer.invoke('devtools:environment:delete', key),
   onState: listener => {
     const handler = (_event, state) => listener(state);
     ipcRenderer.on('devtools:state', handler);

@@ -97,7 +97,7 @@ class HTYFWelcome extends UI.Widget.VBox {
             <span class="htyf-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M7 10.5A9 9 0 0 1 22.2 7L25 4.5v8.2A9 9 0 0 1 10.4 22l-3.9 2.7 1.3-5.1A9 9 0 0 1 7 10.5Z" fill="currentColor"/><path d="M12 12.5h8M12 16h5" stroke="white" stroke-width="2" stroke-linecap="round"/></svg></span>
             <div class="htyf-heading"><div class="htyf-status ${statusClass}">${statusText}</div><div class="htyf-title-row"><h1 class="htyf-title" id="htyf-title">红糖开发助手</h1><p class="htyf-website"><span>红糖小程序 / 小游戏开发</span><a class="htyf-website-link" href="https://mp.dagouzhi.com/" target="_blank" rel="noopener noreferrer" aria-label="访问红糖官网（在浏览器中打开）"><span>访问官网</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4 10 14"/><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg></a></p></div><div class="htyf-description-row"><p class="htyf-description">连接应用，统一查看日志、网络请求与实时通信数据。</p><div class="htyf-chips" aria-label="支持的调试能力"><span class="htyf-chip">Console</span><span class="htyf-chip">Network</span><span class="htyf-chip">WebSocket</span></div></div></div>
           </header>
-          <div class="htyf-content"><div class="htyf-qr-panel"><span class="htyf-qr-frame"><img class="htyf-qr" src="${this.#state?.qr || '/pairing.svg'}" alt="红糖云服调试服务连接二维码"></span><p class="htyf-qr-label">使用 App 扫码快速连接</p></div><div class="htyf-config"><div class="htyf-field"><span class="htyf-label">服务地址</span><code class="htyf-code endpoint"></code></div><div class="htyf-field"><label class="htyf-label" for="htyf-token">连接凭证</label><input class="htyf-input token" id="htyf-token" type="text" autocomplete="off" spellcheck="false"></div><div class="htyf-actions"><button class="htyf-copy" type="button">复制连接配置</button><button class="htyf-update" type="button">更新凭证</button></div><div class="htyf-guide"><span class="htyf-step">1</span>打开设置<span class="htyf-arrow">→</span><span class="htyf-step">2</span>进入 DevTools<span class="htyf-arrow">→</span><span class="htyf-step">3</span>扫码并开启</div></div></div>
+          <div class="htyf-content"><div class="htyf-qr-panel"><span class="htyf-qr-frame"><img class="htyf-qr" src="${this.#state?.qr || '/pairing.svg'}" alt="红糖云服调试服务连接二维码"></span><p class="htyf-qr-label">使用 App 扫码快速连接</p></div><div class="htyf-config"><div class="htyf-field"><span class="htyf-label">服务地址</span><code class="htyf-code endpoint"></code></div><div class="htyf-field"><label class="htyf-label" for="htyf-token">连接凭证</label><input class="htyf-input token" id="htyf-token" type="text" autocomplete="off" spellcheck="false"></div><div class="htyf-actions"><button class="htyf-copy" type="button">复制连接配置</button><button class="htyf-update" type="button">更新凭证</button>${window.devtoolsHost?.openEnvironment ? '<button class="htyf-update htyf-environment" type="button">设置系统环境变量</button>' : ''}</div><div class="htyf-guide"><span class="htyf-step">1</span>打开设置<span class="htyf-arrow">→</span><span class="htyf-step">2</span>进入 DevTools<span class="htyf-arrow">→</span><span class="htyf-step">3</span>扫码并开启</div></div></div>
           <p class="htyf-website-feedback" role="status" aria-live="polite"></p>
           <footer class="htyf-footer"><strong>${available ? '局域网调试服务运行中' : '调试服务不可用'}</strong><span>${connectedCount > 0 ? `${connectedCount} 个应用已连接，可从“运行时”菜单切换` : connectionHint}</span></footer>
         </section>`;
@@ -105,6 +105,17 @@ class HTYFWelcome extends UI.Widget.VBox {
       if (!window.devtoolsHost?.openWebsite) return;
       event.preventDefault();
       void this.#openWebsite(event.currentTarget);
+    });
+    this.contentElement.querySelector('.htyf-environment')?.addEventListener('click', async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        await window.devtoolsHost.openEnvironment();
+      } catch {
+        this.contentElement.querySelector('.htyf-website-feedback').textContent = '无法打开环境变量设置，请重试。';
+      } finally {
+        button.disabled = false;
+      }
     });
     this.contentElement.querySelector('.endpoint').textContent = reporterUrl;
     this.contentElement.querySelector('.token').value = token;
