@@ -5,7 +5,7 @@
 ## 目录结构
 
 ```text
-mp-devtools/
+htyf-devtools/
 ├── app/                       # Electron 桌面端
 ├── packages/
 │   ├── devtools-protocol/     # Reporter 通信协议
