@@ -29,7 +29,7 @@
     "ws": "7.5.12"
   },
   "devDependencies": {
-    "@react-native/debugger-frontend": "0.86.3",
+    "@react-native/debugger-frontend": "0.88.1",
     "electron": "39.8.10",
     "electron-builder": "26.16.0"
   }
