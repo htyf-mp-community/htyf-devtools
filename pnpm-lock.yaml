@@ -27,15 +27,15 @@ importers:
         specifier: 1.5.4
         version: 1.5.4
       systeminformation:
-        specifier: 5.33.8
-        version: 5.33.8
+        specifier: 5.33.19
+        version: 5.33.19
       ws:
         specifier: 7.5.12
         version: 7.5.12
     devDependencies:
       '@react-native/debugger-frontend':
-        specifier: 0.86.3
-        version: 0.86.3
+        specifier: 0.88.1
+        version: 0.88.1
       electron:
         specifier: 39.8.10
         version: 39.8.10
@@ -678,12 +678,12 @@ packages:
       '@react-native/metro-config':
         optional: true
 
-  '@react-native/debugger-frontend@0.86.3':
-    resolution: {integrity: sha512-TQmeofQ0PcuylhhlleOeuzHYZfbrgm3gayXzowqUEzgRisTm1D40/J3ggqs7XkQi5HP5ZA3n8dHmKL9vIzPcsw==}
-    engines: {node: ^20.19.4 || ^22.13.0 || ^24.3.0 || >= 25.0.0}
-
   '@react-native/debugger-frontend@0.87.1':
     resolution: {integrity: sha512-RNm7soJB+8YSauLnsCCylA1eVfT6JWaDTPUEF01uu9YwDyZ7remKlZbXtmVbtscbNGcp+hbI4iZUdVOpQWsHuA==}
+    engines: {node: ^22.13.0 || ^24.3.0 || >= 26.0.0}
+
+  '@react-native/debugger-frontend@0.88.1':
+    resolution: {integrity: sha512-4ZjH2093hZWWgsYs5ExqjzJX5uCS4R5yZa17eRHsQClUc6RjlV61kLdIk722sQReLL+NYtBn2RJtdcQtLCwiug==}
     engines: {node: ^22.13.0 || ^24.3.0 || >= 26.0.0}
 
   '@react-native/debugger-shell@0.87.1':
@@ -2929,8 +2929,8 @@ packages:
     resolution: {integrity: sha512-MpUEN2OodtUzxvKQl72cUF7RQ5EiHsGvSsVG0ia9c5RbWGL2CI4C7EpPS8UTBIplnlzZiNuV56w+FuNxy3ty2Q==}
     engines: {node: '>=10'}
 
-  systeminformation@5.33.8:
-    resolution: {integrity: sha512-v4F6OGYGh7wDvV68YmjOmZwGixV9A/GQ7d2b84t0UF4CaOy9jipNWIJDkHqYDYiTPuiojqlwVQd0hfUKOUN7tQ==}
+  systeminformation@5.33.19:
+    resolution: {integrity: sha512-Zm7wGeCG7PqfvzegMJIzrxICopWqYCeLATVmvxOOci1isLcNVKgY4Fr0hhYQzvc7cgtK3377jQVChTFAnznOiA==}
     engines: {node: '>=10.0.0'}
     os: [darwin, linux, win32, freebsd, openbsd, netbsd, sunos, android]
     hasBin: true
@@ -3942,9 +3942,9 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@react-native/debugger-frontend@0.86.3': {}
-
   '@react-native/debugger-frontend@0.87.1': {}
+
+  '@react-native/debugger-frontend@0.88.1': {}
 
   '@react-native/debugger-shell@0.87.1':
     dependencies:
@@ -6682,7 +6682,7 @@ snapshots:
     dependencies:
       has-flag: 4.0.0
 
-  systeminformation@5.33.8: {}
+  systeminformation@5.33.19: {}
 
   tar-stream@2.2.0:
     dependencies:
